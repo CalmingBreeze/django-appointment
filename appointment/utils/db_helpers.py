@@ -64,8 +64,7 @@ def calculate_slots(start_time, end_time, buffer_time, slot_duration):
     :return: A list of available slots.
     """
     slots = []
-    
-    # print(start_time, start_time.is_aware(), end_time, end_time.is_aware(), buffer_time, slot_duration)
+
     buffer_time = buffer_time.replace(tzinfo=None)
     print("calculate_slots:buffer time", buffer_time)
     while start_time + slot_duration <= end_time:
@@ -88,23 +87,34 @@ def calculate_staff_slots(date, staff_member):
         return []
     staff_member_start_time = get_staff_member_start_time(staff_member, date)
 
-
     start_time = datetime.datetime.combine(date, staff_member_start_time)
     end_time = datetime.datetime.combine(date, get_staff_member_end_time(staff_member, date))
 
-    # Convert the buffer duration in minutes to a timedelta object
-    buffer_duration_minutes = get_staff_member_buffer_time(staff_member, date)
-    # print('calculate_staff_slots:buffer_duration_minutes', buffer_duration_minutes)
-    buffer_duration = datetime.timedelta(minutes=buffer_duration_minutes)
-    print('calculate_staff_slots:buffer_duration', buffer_duration)
-    # naive/aware TODO
-    buffer_time_init = datetime.datetime.combine(date, staff_member_start_time, datetime.UTC)
-    print('calculate_staff_slots:buffer_time_init', buffer_time_init)
-    print('calculate_staff_slots:timezone.localtime()', timezone.localtime())
-    if date == timezone.now().date() and buffer_time_init < timezone.localtime():
-        buffer_time_init = timezone.localtime()
+    #check if we have to handle buffer time
+    #TODO find better condition in case of extreme TZ
+    if date == timezone.now().date():
+        # Convert the buffer duration in minutes to a timedelta object
+        buffer_duration_minutes = get_staff_member_buffer_time(staff_member, date)
+        buffer_duration = datetime.timedelta(minutes=buffer_duration_minutes)
+        print('calculate_staff_slots:buffer_duration', buffer_duration)
 
-    buffer_time = buffer_time_init + buffer_duration
+        current_tz = timezone.get_current_timezone() or datetime.UTC
+        buffer_time_init = datetime.datetime.combine(date, staff_member_start_time, current_tz)
+
+        if(timezone.localtime() + buffer_duration < buffer_time_init):
+            #no buffer needed if we have buffer time before staff start.
+            buffer_time = start_time
+        else:
+            # update buffer during the day
+            if buffer_time_init < timezone.localtime():
+                print('calculate_staff_slots:buffer_time_init < timezone.localtime()', buffer_time_init < timezone.localtime())
+                buffer_time_init = timezone.localtime()
+            buffer_time = buffer_time_init + buffer_duration
+
+    else:
+        # buffer_time only apply to current day
+        buffer_time = start_time
+
     print('calculate_staff_slots:buffer_time', buffer_time)
 
     # Convert slot duration to a timedelta object
@@ -287,6 +297,8 @@ def create_user_with_email(client_data: dict):
 
     # Filter client_data to include only valid fields
     user_data = {field: client_data.get(field, '') for field in valid_fields}
+
+    print(user_data)
 
     user = CLIENT_MODEL.objects.create_user(**user_data)
     return user
