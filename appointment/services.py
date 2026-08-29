@@ -402,8 +402,10 @@ def get_available_slots(date, appointments):
     """
 
     start_time, end_time, slot_duration, buff_time = get_times_from_config(date)
-    now = timezone.now()
+    # now = timezone.now()
+    now = timezone.localtime()
     buffer_time = now + buff_time if date == now.date() else now
+    print("get_available_slots", start_time, end_time, buffer_time, slot_duration)
     slots = calculate_slots(start_time, end_time, buffer_time, slot_duration)
     slots = exclude_booked_slots(appointments, slots, slot_duration)
     return [localize(slot.time()) for slot in slots]
