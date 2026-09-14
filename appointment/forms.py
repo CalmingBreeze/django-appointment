@@ -9,10 +9,10 @@ Since: 1.0.0
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.formfields import SplitPhoneNumberField
-from datetime import time
+from datetime import time, datetime
 
 from .models import (
-    Appointment, AppointmentRequest, AppointmentRescheduleHistory, DayOff, Service, StaffMember,
+    Appointment, AppointmentRequest, AppointmentRescheduleHistory, DayOff, Unavailability, Service, StaffMember,
     WorkingHours
 )
 from .utils.db_helpers import get_user_model
@@ -197,6 +197,26 @@ class StaffDaysOffForm(forms.ModelForm):
         widgets = {
             'start_date': forms.DateInput(attrs={'class': 'datepicker'}),
             'end_date': forms.DateInput(attrs={'class': 'datepicker'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        return cleaned_data
+
+class StaffUnavailabilityForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(StaffUnavailabilityForm, self).__init__(*args, **kwargs)
+        self.fields['date'].initial = datetime.today()
+        self.fields['start_time'].initial = time(9,0)
+        self.fields['end_time'].initial = time(17,0)
+
+    class Meta:
+        model = Unavailability
+        fields = ['date', 'start_time', 'end_time', 'description']
+        widgets = {
+            'date': forms.DateInput(attrs={'class': 'datepicker'}),
+            'start_time': forms.DateTimeInput(attrs={'class': 'timepicker'}),
+            'end_time': forms.DateTimeInput(attrs={'class': 'timepicker'}),
         }
 
     def clean(self):
