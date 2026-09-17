@@ -55,31 +55,41 @@ EmailVerificationCode = apps.get_model('appointment', 'EmailVerificationCode')
 AppointmentRescheduleHistory = apps.get_model('appointment', 'AppointmentRescheduleHistory')
 
 
-def calculate_slots(start_time, end_time, buffer_time, slot_duration):
+def calculate_slots(start_time, end_time, buffer_time, slot_duration, service_duration = None):
     """Calculate the available slots between the given start and end times using the given buffer time and slot duration
 
     :param start_time: The start time.
     :param end_time: The end time.
     :param buffer_time: The buffer time.
     :param slot_duration: The duration of each slot.
+    :param service_duration: The service duration.
     :return: A list of available slots.
     """
     slots = []
 
     buffer_time = buffer_time.replace(tzinfo=None)
-    print("calculate_slots:buffer time", buffer_time)
-    while start_time + slot_duration <= end_time:
+    print("calculate_slots:end_time:service_duration",service_duration)
+    if service_duration:
+        # Subtract the service duration from end_time to prevent slots from extending past closing time.
+        end_time -= service_duration
+    else:
+        # (do not propose end_time as valid slot)
+        end_time -= slot_duration
+    print("calculate_slots:end_time:fixed",end_time)
+
+    while start_time <= end_time:
         if start_time >= buffer_time:
             slots.append(start_time)
         start_time += slot_duration
     return slots
 
 
-def calculate_staff_slots(date, staff_member):
+def calculate_staff_slots(date, staff_member, service_duration = None):
     """Calculate the available slots for the given staff member on the given date.
 
     :param date: The date to calculate the slots for.
     :param staff_member: The staff member to calculate the slots for.
+    :param service_duration: The duration of the service used to generate available time slots.
     :return: A list of available slots.
     """
     # Convert the times to datetime objects
@@ -97,7 +107,6 @@ def calculate_staff_slots(date, staff_member):
         # Convert the buffer duration in minutes to a timedelta object
         buffer_duration_minutes = get_staff_member_buffer_time(staff_member, date)
         buffer_duration = datetime.timedelta(minutes=buffer_duration_minutes)
-        print('calculate_staff_slots:buffer_duration', buffer_duration)
 
         current_tz = timezone.get_current_timezone() or datetime.UTC
         buffer_time_init = datetime.datetime.combine(date, staff_member_start_time, current_tz)
@@ -108,7 +117,6 @@ def calculate_staff_slots(date, staff_member):
         else:
             # update buffer during the day
             if buffer_time_init < timezone.localtime():
-                print('calculate_staff_slots:buffer_time_init < timezone.localtime()', buffer_time_init < timezone.localtime())
                 buffer_time_init = timezone.localtime()
             buffer_time = buffer_time_init + buffer_duration
 
@@ -116,13 +124,11 @@ def calculate_staff_slots(date, staff_member):
         # buffer_time only apply to current day
         buffer_time = start_time
 
-    print('calculate_staff_slots:buffer_time', buffer_time)
-
     # Convert slot duration to a timedelta object
     slot_duration_minutes = get_staff_member_slot_duration(staff_member, date)
     slot_duration = datetime.timedelta(minutes=slot_duration_minutes)
 
-    return calculate_slots(start_time, end_time, buffer_time, slot_duration)
+    return calculate_slots(start_time, end_time, buffer_time, slot_duration, service_duration)
 
 
 def check_day_off_for_staff(staff_member, date) -> bool:
