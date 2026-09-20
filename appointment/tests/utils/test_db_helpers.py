@@ -17,7 +17,7 @@ from django.contrib.auth.models import AnonymousUser
 
 from appointment.logger_config import get_logger
 from appointment.models import Config, DayOff, PaymentInfo
-from appointment.settings import check_q_cluster
+from appointment.settings import CONFIG_CACHE_KEY, check_q_cluster
 from appointment.tests.base.base_test import BaseTest
 from appointment.tests.mixins.base_mixin import ConfigMixin
 from appointment.utils.db_helpers import (
@@ -119,8 +119,15 @@ class TestCalculateStaffSlots(BaseTest):
     def setUp(self):
         super().setUp()
         self.slot_duration = datetime.timedelta(minutes=30)
+        # Anchored on the current day so these tests never go stale, and pinned to a
+        # fixed hour so they do not depend on what time of day the suite runs.
+        self.reference_now = datetime.datetime.combine(timezone.localtime().date(), datetime.time(9, 0))
         # Not working today but tomorrow
+<<<<<<< HEAD
         self.date_not_working = datetime.date(2026, 9, 18)
+=======
+        self.date_not_working = self.reference_now.date()
+>>>>>>> upstream/main
         self.working_date1 = self.date_not_working + datetime.timedelta(days=1)
         self.working_date2 = self.date_not_working + datetime.timedelta(days=2)
         weekday_num1 = get_weekday_num_from_date(self.working_date1)
@@ -148,7 +155,13 @@ class TestCalculateStaffSlots(BaseTest):
         cache.clear()
         super().tearDown()
 
+<<<<<<< HEAD
     def test_calculate_slots_on_working_day_within_buffer_time(self):
+=======
+    @patch("appointment.utils.db_helpers.timezone.localtime")
+    def test_calculate_slots_on_working_day_within_buffer_time(self, mock_localtime):
+        mock_localtime.return_value = self.reference_now
+>>>>>>> upstream/main
         slots = calculate_staff_slots(self.working_date1, self.staff_member1)
         # Buffertime is 48 Hours
         # We are checking for "tomorrow" so only 24h in the future. We should not have any slot available.
@@ -157,10 +170,17 @@ class TestCalculateStaffSlots(BaseTest):
     @patch("appointment.utils.db_helpers.timezone.localtime")
     def test_calculate_slots_on_working_day_without_appointments(self, mock_localtime):
         """Test that buffer time works beyond the first day """
+<<<<<<< HEAD
         mock_localtime.return_value = datetime.datetime(2026, 9, 18, 9, 0) # set localtime 2026-9-18 @ 9:00 AM
 
         self.staff_member1.appointment_buffer_time += 25.0 # we add 25min as buffer to test if the first slot is removed as expected
         slots = calculate_staff_slots(self.working_date2, self.staff_member1) # checking slot for 2026-9-20
+=======
+        mock_localtime.return_value = self.reference_now # today @ 9:00 AM
+
+        self.staff_member1.appointment_buffer_time += 25.0 # we add 25min as buffer to test if the first slot is removed as expected
+        slots = calculate_staff_slots(self.working_date2, self.staff_member1) # checking slots for today + 2
+>>>>>>> upstream/main
         # First slot is excluded due to 25min buffer time.
         expected_slots = [
             datetime.time(9, 30),
@@ -185,11 +205,19 @@ class TestCalculateStaffSlots(BaseTest):
     @patch("appointment.utils.db_helpers.timezone.localtime")
     def test_calculate_slots_on_working_day_without_appointments_with_service_duration(self, mock_localtime):
         """Test that buffer time and service duration works together"""
+<<<<<<< HEAD
         mock_localtime.return_value = datetime.datetime(2026, 9, 18, 9, 0) # set localtime 2026-9-18 @ 9:00 AM
 
         self.staff_member1.appointment_buffer_time += 25.0 # we add 25 min as buffer to test if the first slot is removed as expected
         service_duration = datetime.timedelta(minutes=90) # we had a service of 1h30.
         slots = calculate_staff_slots(self.working_date2, self.staff_member1, service_duration) # checking slot for 2026-9-20
+=======
+        mock_localtime.return_value = self.reference_now # today @ 9:00 AM
+
+        self.staff_member1.appointment_buffer_time += 25.0 # we add 25 min as buffer to test if the first slot is removed as expected
+        service_duration = datetime.timedelta(minutes=90) # we had a service of 1h30.
+        slots = calculate_staff_slots(self.working_date2, self.staff_member1, service_duration) # checking slots for today + 2
+>>>>>>> upstream/main
         # First slot is excluded due to 25 min buffer time, and last slot is 3:30 PM because of the 90 min service duration and end working time 5 PM
         expected_slots = [
             datetime.time(9, 30),
@@ -943,13 +971,33 @@ class TestGetConfig(TestCase):
     def test_config_in_cache(self):
         """Test when there's a Config object in the cache."""
         db_config = Config.objects.create(finish_time='17:00:00')
-        cache.set('config', db_config)
+        cache.set(CONFIG_CACHE_KEY, db_config)
 
-        # Clear the database to ensure it won't be accessed
+        # Served from the cache: the database is not queried at all. Emptying the
+        # table to prove that no longer works, as deleting now clears the cache too.
+        with self.assertNumQueries(0):
+            config = get_config()
+        self.assertEqual(config, db_config)
+
+    def test_saving_config_invalidates_the_cache(self):
+        """An edit must be visible at once, not when the hour-long entry expires."""
+        Config.objects.create(finish_time='17:00:00', slot_duration=30)
+        self.assertEqual(get_config().slot_duration, 30)
+
+        config = Config.objects.first()
+        config.slot_duration = 45
+        config.save()
+
+        self.assertEqual(get_config().slot_duration, 45)
+
+    def test_deleting_config_invalidates_the_cache(self):
+        """Deleting the Config must not leave the old one being served."""
+        Config.objects.create(finish_time='17:00:00', slot_duration=30)
+        self.assertIsNotNone(get_config())
+
         Config.objects.all().delete()
 
-        config = get_config()
-        self.assertEqual(config, db_config)
+        self.assertIsNone(get_config())
 
 
 class TestGetDayOffById(BaseTest):  # Assuming you have a BaseTest class with some initial setups
