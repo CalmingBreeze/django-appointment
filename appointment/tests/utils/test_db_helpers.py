@@ -123,7 +123,11 @@ class TestCalculateStaffSlots(BaseTest):
         # fixed hour so they do not depend on what time of day the suite runs.
         self.reference_now = datetime.datetime.combine(timezone.localtime().date(), datetime.time(9, 0))
         # Not working today but tomorrow
+<<<<<<< HEAD
+        self.date_not_working = datetime.date(2026, 9, 18)
+=======
         self.date_not_working = self.reference_now.date()
+>>>>>>> upstream/main
         self.working_date1 = self.date_not_working + datetime.timedelta(days=1)
         self.working_date2 = self.date_not_working + datetime.timedelta(days=2)
         weekday_num1 = get_weekday_num_from_date(self.working_date1)
@@ -151,9 +155,13 @@ class TestCalculateStaffSlots(BaseTest):
         cache.clear()
         super().tearDown()
 
+<<<<<<< HEAD
+    def test_calculate_slots_on_working_day_within_buffer_time(self):
+=======
     @patch("appointment.utils.db_helpers.timezone.localtime")
     def test_calculate_slots_on_working_day_within_buffer_time(self, mock_localtime):
         mock_localtime.return_value = self.reference_now
+>>>>>>> upstream/main
         slots = calculate_staff_slots(self.working_date1, self.staff_member1)
         # Buffertime is 48 Hours
         # We are checking for "tomorrow" so only 24h in the future. We should not have any slot available.
@@ -162,10 +170,17 @@ class TestCalculateStaffSlots(BaseTest):
     @patch("appointment.utils.db_helpers.timezone.localtime")
     def test_calculate_slots_on_working_day_without_appointments(self, mock_localtime):
         """Test that buffer time works beyond the first day """
+<<<<<<< HEAD
+        mock_localtime.return_value = datetime.datetime(2026, 9, 18, 9, 0) # set localtime 2026-9-18 @ 9:00 AM
+
+        self.staff_member1.appointment_buffer_time += 25.0 # we add 25min as buffer to test if the first slot is removed as expected
+        slots = calculate_staff_slots(self.working_date2, self.staff_member1) # checking slot for 2026-9-20
+=======
         mock_localtime.return_value = self.reference_now # today @ 9:00 AM
 
         self.staff_member1.appointment_buffer_time += 25.0 # we add 25min as buffer to test if the first slot is removed as expected
         slots = calculate_staff_slots(self.working_date2, self.staff_member1) # checking slots for today + 2
+>>>>>>> upstream/main
         # First slot is excluded due to 25min buffer time.
         expected_slots = [
             datetime.time(9, 30),
@@ -190,11 +205,19 @@ class TestCalculateStaffSlots(BaseTest):
     @patch("appointment.utils.db_helpers.timezone.localtime")
     def test_calculate_slots_on_working_day_without_appointments_with_service_duration(self, mock_localtime):
         """Test that buffer time and service duration works together"""
+<<<<<<< HEAD
+        mock_localtime.return_value = datetime.datetime(2026, 9, 18, 9, 0) # set localtime 2026-9-18 @ 9:00 AM
+
+        self.staff_member1.appointment_buffer_time += 25.0 # we add 25 min as buffer to test if the first slot is removed as expected
+        service_duration = datetime.timedelta(minutes=90) # we had a service of 1h30.
+        slots = calculate_staff_slots(self.working_date2, self.staff_member1, service_duration) # checking slot for 2026-9-20
+=======
         mock_localtime.return_value = self.reference_now # today @ 9:00 AM
 
         self.staff_member1.appointment_buffer_time += 25.0 # we add 25 min as buffer to test if the first slot is removed as expected
         service_duration = datetime.timedelta(minutes=90) # we had a service of 1h30.
         slots = calculate_staff_slots(self.working_date2, self.staff_member1, service_duration) # checking slots for today + 2
+>>>>>>> upstream/main
         # First slot is excluded due to 25 min buffer time, and last slot is 3:30 PM because of the 90 min service duration and end working time 5 PM
         expected_slots = [
             datetime.time(9, 30),
